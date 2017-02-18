@@ -1,0 +1,259 @@
+---
+title: Required sample size given a desired confidence interval width for Cohen's
+  d
+author: "Gjalt-Jorn Peters & Rik Crutzen"
+date: "12 February 2017"
+output: html_document
+---
+
+```{r setup, echo=FALSE, warning=FALSE, message=FALSE }
+
+################################################################################
+################################################################################
+### Configure basic settings
+################################################################################
+################################################################################
+
+########################################################################
+### Paths
+########################################################################
+
+### Add any relevant paths to this vector. The script will select the
+### correct path itself.
+
+basePathVector <- c('B:/Data/research/sample size for confidence intervals',
+                    "");
+
+########################################################################
+### Set the variables with the paths
+########################################################################
+
+### Check which paths exist and set the first existing path in the list
+### as the base path
+basePath <- basePathVector[sapply(basePathVector, dir.exists)][1];
+
+### Set the additional paths
+workingPath <- basePath;
+outputPath <- basePath;
+
+########################################################################
+### Packages
+########################################################################
+
+  require(userfriendlyscience);
+  require(ggplot2);
+  require(pander);
+  require(pwr);
+  require(grid);
+  require(gridExtra);
+  require(pwr);
+
+  knitr::opts_chunk$set(echo = FALSE);
+
+  setTabCapNumbering();
+
+  cohensDvalues <- c(.2, .5, .8);
+  widths <- c(.05, .1, .15, .2, .25, .3, .35, .4, .45, .5);
+  powerValues <- c(.8, .9, .95);
+
+  exampleD <- .5;
+  examplePower <- .8;
+  exampleN <- 2 * ceiling(pwr.t.test(d=exampleD, power=examplePower)$n);
+
+  table1 <- sapply(widths, function(width) {
+    return(sapply(cohensDvalues, function(cohensD) {
+      return(pwr.cohensdCI(d=cohensD, w=width, conf.level=.95, silent=TRUE));
+    }));
+  });
+
+  table2 <- sapply(powerValues, function(power) {
+    return(sapply(cohensDvalues, function(cohensD) {
+      return(2*ceiling(pwr.t.test(d=cohensD, power=power)$n));
+    }));
+  });
+
+  table3 <- sapply(widths, function(width) {
+    return(sapply(cohensDvalues, function(cohensD) {
+      return(pwr.cohensdCI(d=cohensD, w=width, conf.level=.99, silent=TRUE));
+    }));
+  });
+
+  rownames(table1) <- rownames(table3) <- cohensDvalues;
+  colnames(table1) <- colnames(table3) <- widths;
+  rownames(table2) <- cohensDvalues;
+  colnames(table2) <- powerValues;
+
+```
+
+```{r message=FALSE, warnings=FALSE}
+  exampleConfInt <- cohensdCI(exampleD, n=exampleN);
+  pander(round(exampleConfInt, 2));
+  cat("Required sample size with 95% power:", 2 * ceiling(pwr.t.test(d=exampleConfInt[1], power=.95)$n));
+  cat("Required sample size with 80% power:", 2 * ceiling(pwr.t.test(d=exampleConfInt[1], power=.80)$n));
+```
+
+```{r tab.cap="95% confidence."}
+  pander(table1);
+```
+
+```{r tab.cap="Power."}
+  pander(table2);
+```
+
+```{r tab.cap="99% confidence."}
+  pander(table3);
+```
+
+```{r fig.cap="Figure 1"}
+
+  dSamplingDist <- cohensdCI(d=exampleD, n=exampleN, plot=TRUE);
+  dSamplingDist <- attr(dSamplingDist, 'plot') +
+    xlab("Cohen's d") + ylab("Density") + ggtitle("Sampling distribution for Cohen's d") +
+    theme_bw(base_size = 30);
+
+  ggsave(file.path(basePath, "fig1 - cohen's d sampling distribution.png"),
+         plot = dSamplingDist,
+         width=10, height=10,
+         dpi=300, type='cairo-png');
+
+```
+
+```{r message=FALSE, warning=FALSE}
+
+  if (!file.exists(file.path(basePath, 'rpp_data.csv'))) {
+    stop("The file 'rpp_data.csv' is not available. Please visit https://osf.io/fgjvw and download it (see https://osf.io/bhcsf for the codebook).");
+  }
+
+  ### Import data
+  dat <- getData(file.path(basePath, 'rpp_data.csv'));
+  cat("Read", nrow(dat), "studies.");
+  
+  ### Select two-cell designs
+  dat <- dat[grep('^(t\\()|(F\\(1)', dat$Test.statistic..O.), ];
+  cat("Selected", nrow(dat), "two-cell designs.");
+  
+  ### Convenient names for the sample size.
+  dat$originalEffectSize <- convert.r.to.d(as.numeric(dat$T_r..O.));
+  dat$replicationEffectSize <- convert.r.to.d(as.numeric(dat$T_r..R.));
+  dat$originalSampleSize <- as.numeric(dat$N..O.);
+  dat$replicationSampleSize <- as.numeric(dat$N..R.);
+
+  ### Remove missing values
+  dat <- dat[, c('originalEffectSize', 'replicationEffectSize',
+                 'originalSampleSize', 'replicationSampleSize')];
+  dat <- na.omit(dat);
+  cat("Retained samples after removing missing values:", nrow(dat));
+  
+  ### Remove huge sample sizes
+  cat("Removing", sum(dat$replicationSampleSize >= 1000),
+      "samples of over 1000 participants,");
+  dat <- dat[dat$replicationSampleSize < 1000 ,];
+  
+  ### Add confidence intervals
+  dat <- cbind(dat,
+               cohensdCI(d=dat$originalEffectSize, n=dat$originalSampleSize),
+               cohensdCI(d=dat$replicationEffectSize, n=dat$replicationSampleSize));
+  names(dat)[5:8] <- c('original.lo', 'original.hi',
+                       'replication.lo', 'replication.hi');
+  
+  ### Add widths
+  dat$originalWidths <- dat$original.hi - dat$original.lo;
+  dat$replicationWidths <- dat$replication.hi - dat$replication.lo;
+
+```
+
+```{r fig.width=9, fig.height=30, warning=FALSE, message=FALSE }
+
+  plotOriginal <- diamondPlot(dat, c(5, 1, 6),
+                              yLabels=paste0("d = ", round(dat[, 1], 2), " ",
+                                             apply(dat[, 5:6], 1, formatCI),
+                                             ", N = ", dat[, 3]),
+                              linetype=1, alpha=.1, fixedSize=.35) +
+    scale_x_continuous(breaks=-3:8) +
+    theme(text = element_text(size = 16),
+          panel.grid.major.y = element_blank()) +
+  xlab("Cohen's d") +
+  ggtitle("95% CIs original studies");
+  
+  plotReplication <- diamondPlot(dat, c(7, 2, 8),
+                                 yLabels=paste0("d = ", round(dat[, 2], 2), " ",
+                                             apply(dat[, 7:8], 1, formatCI),
+                                             ", N = ", dat[, 4]),
+                                 linetype=1, alpha=.1, fixedSize=.35) +
+    scale_x_continuous(breaks=-3:8) +
+    theme(text = element_text(size = 16),
+          panel.grid.major.y = element_blank()) +
+  xlab("Cohen's d") +
+  ggtitle("95% CIs replication studies");
+
+  ciPlot <- grid.arrange(plotOriginal, plotReplication, ncol=2);
+
+  ggsave(file.path(basePath, "fig2 - confidence intervals.png"),
+         plot = ciPlot,
+         width=16, height=22,
+         dpi=300, type='cairo-png');
+
+```
+
+```{r fig.width=6, fig.height=3}
+
+  pander(descr(dat$originalWidths));
+  pander(descr(dat$replicationWidths));
+
+  widthsPlot <-
+    grid.arrange(powerHist(dat$originalWidths, normalCurve=FALSE, distCurve=FALSE, returnPlotOnly = TRUE,
+                         xLabel = 'Width of 95% confidence interval', yLabel = 'Number of studies') +
+                   theme(text = element_text(size = 16)) +
+                   ggtitle("95% CI widths in original studies"),
+               powerHist(dat$replicationWidths, normalCurve=FALSE, distCurve=FALSE, returnPlotOnly = TRUE,
+                         xLabel = 'Width of 95% confidence interval', yLabel = 'Number of studies') +
+                   theme(text = element_text(size = 16)) +
+                   ggtitle("95% CI widths in replications"),
+               ncol=2);
+
+  ggsave(file.path(basePath, "fig3 - confidence interval widths.png"),
+         plot = widthsPlot,
+         width=10, height=5,
+         dpi=300, type='cairo');
+
+CIwidths <- data.frame(width = c(dat$originalWidths, dat$replicationWidths),
+                       n = c(dat$originalSampleSize, dat$replicationSampleSize),
+                       Study = factor(rep(c("Original", "Replication"), each=nrow(dat))));
+
+ggplot(CIwidths, aes(x = Study,
+                     y = width,
+                     #shape = Study,
+                     fill = n)) +
+  geom_point(size=5, alpha=1,
+             shape=21,
+             stroke = 1,
+             color = 'black',
+             position=position_jitterdodge(jitter.width = .5,
+                                           jitter.height = 0,
+                                           dodge.width = .7)) +
+  theme_bw(base_size = 20) +
+  scale_fill_continuous(low="#BBBBBB", high="#000000", limits=c(0, 500)) +
+  #scale_shape_manual(values=c(21, 24)) +
+  scale_x_discrete(limits=rev(unique(CIwidths$Study))) +
+  scale_y_continuous(breaks=0:5, limits=c(0,5)) +
+  guides(shape = "none", fill=guide_colorbar("N: ", reverse=TRUE)) +
+  ylab("Confidence interval width (in Cohen's d)") +
+  theme(legend.position = 'top',
+        legend.key.width = unit(7.5, 'line')) +
+  coord_flip();
+  
+ggsave(file.path(outputPath, "figure 3 - confidence interval widths.png"), 
+       width = 10,
+       height = 5,
+       type='cairo-png');
+
+  cat("Width of 95% CI for n=1500, d = .2:",
+      round(cohensdCI(.2, n=1500)[2] - cohensdCI(.2, n=1500)[1], 2));
+  cat("Width of 99% CI for n=1500, d = .2:",
+      round(cohensdCI(.2, n=1500, .99)[2] - cohensdCI(.2, n=1500, .99)[1], 2));
+  cat("Width of 95% CI for n=7500, d = .2:",
+      round(cohensdCI(.2, n=750)[2] - cohensdCI(.2, n=750)[1], 2));
+  cat("Width of 99% CI for n=750, d = .2:",
+      round(cohensdCI(.2, n=750, .99)[2] - cohensdCI(.2, n=750, .99)[1], 2));
+
+```
