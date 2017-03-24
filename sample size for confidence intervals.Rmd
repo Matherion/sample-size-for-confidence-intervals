@@ -2,7 +2,7 @@
 title: Required sample size given a desired confidence interval width for Cohen's
   d
 author: "Gjalt-Jorn Peters & Rik Crutzen"
-date: "12 February 2017"
+date: "`r format(Sys.time(), '%d %b %Y at %H:%M:%S');`"
 output: html_document
 ---
 
