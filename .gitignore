@@ -33,9 +33,6 @@ vignettes/*.pdf
 # RProject
 *.Rproj
 
-# HTML files
-*.html
-
 # knitr and R markdown default cache directories
 /*_cache/
 /cache/
