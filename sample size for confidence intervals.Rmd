@@ -21,7 +21,7 @@ output: html_document
 ### Add any relevant paths to this vector. The script will select the
 ### correct path itself.
 
-basePathVector <- c('B:/Data/research/sample size for confidence intervals',
+basePathVector <- c('B:/Data/research/sample size for confidence intervals/sample-size-for-confidence-intervals',
                     "");
 
 ########################################################################
@@ -85,31 +85,33 @@ outputPath <- basePath;
 
 ```
 
-```{r message=FALSE, warnings=FALSE}
+```{r message=FALSE, warnings=FALSE, results='asis'}
   exampleConfInt <- cohensdCI(exampleD, n=exampleN);
-  pander(round(exampleConfInt, 2));
-  cat("Required sample size with 95% power:", 2 * ceiling(pwr.t.test(d=exampleConfInt[1], power=.95)$n));
-  cat("Required sample size with 80% power:", 2 * ceiling(pwr.t.test(d=exampleConfInt[1], power=.80)$n));
+  pander(as.data.frame(round(exampleConfInt, 2)));
+  pandoc.p(paste("Required sample size with 95% power:", 2 * ceiling(pwr.t.test(d=exampleConfInt[1], power=.95)$n)));
+  pandoc.p(paste("Required sample size with 80% power:", 2 * ceiling(pwr.t.test(d=exampleConfInt[1], power=.80)$n)));
 ```
 
-```{r tab.cap="95% confidence."}
+```{r tab.cap="95% confidence.", results='asis'}
   pander(table1);
 ```
 
-```{r tab.cap="Power."}
+```{r tab.cap="Power.", results='asis'}
   pander(table2);
 ```
 
-```{r tab.cap="99% confidence."}
+```{r tab.cap="99% confidence.", results='asis'}
   pander(table3);
 ```
 
-```{r fig.cap="Figure 1"}
+```{r fig.cap="Figure 1", fig.width=10, fig.height=10, results='asis'}
 
   dSamplingDist <- cohensdCI(d=exampleD, n=exampleN, plot=TRUE);
   dSamplingDist <- attr(dSamplingDist, 'plot') +
     xlab("Cohen's d") + ylab("Density") + ggtitle("Sampling distribution for Cohen's d") +
-    theme_bw(base_size = 30);
+    theme_bw(base_size = 30) + theme(axis.title.x.top = element_blank());
+
+  grid.draw(dSamplingDist);
 
   ggsave(file.path(basePath, "fig1 - cohen's d sampling distribution.png"),
          plot = dSamplingDist,
@@ -118,7 +120,7 @@ outputPath <- basePath;
 
 ```
 
-```{r message=FALSE, warning=FALSE}
+```{r message=FALSE, warning=FALSE, results='asis'}
 
   if (!file.exists(file.path(basePath, 'rpp_data.csv'))) {
     stop("The file 'rpp_data.csv' is not available. Please visit https://osf.io/fgjvw and download it (see https://osf.io/bhcsf for the codebook).");
@@ -126,11 +128,11 @@ outputPath <- basePath;
 
   ### Import data
   dat <- getData(file.path(basePath, 'rpp_data.csv'));
-  cat("Read", nrow(dat), "studies.");
+  pandoc.p(paste("Read", nrow(dat), "studies."));
   
   ### Select two-cell designs
   dat <- dat[grep('^(t\\()|(F\\(1)', dat$Test.statistic..O.), ];
-  cat("Selected", nrow(dat), "two-cell designs.");
+  pandoc.p(paste("Selected", nrow(dat), "two-cell designs."));
   
   ### Convenient names for the sample size.
   dat$originalEffectSize <- convert.r.to.d(as.numeric(dat$T_r..O.));
@@ -142,11 +144,11 @@ outputPath <- basePath;
   dat <- dat[, c('originalEffectSize', 'replicationEffectSize',
                  'originalSampleSize', 'replicationSampleSize')];
   dat <- na.omit(dat);
-  cat("Retained samples after removing missing values:", nrow(dat));
+  pandoc.p(paste("Retained samples after removing missing values:", nrow(dat)));
   
   ### Remove huge sample sizes
-  cat("Removing", sum(dat$replicationSampleSize >= 1000),
-      "samples of over 1000 participants,");
+  pandoc.p(paste("Removing", sum(dat$replicationSampleSize >= 1000),
+      "samples of over 1000 participants,"));
   dat <- dat[dat$replicationSampleSize < 1000 ,];
   
   ### Add confidence intervals
@@ -162,7 +164,7 @@ outputPath <- basePath;
 
 ```
 
-```{r fig.width=9, fig.height=30, warning=FALSE, message=FALSE }
+```{r fig.width=9, fig.height=30, warning=FALSE, message=FALSE, results='asis'}
 
   plotOriginal <- diamondPlot(dat, c(5, 1, 6),
                               yLabels=paste0("d = ", round(dat[, 1], 2), " ",
@@ -195,13 +197,13 @@ outputPath <- basePath;
 
 ```
 
-```{r fig.width=6, fig.height=3}
+```{r fig.width=6, fig.height=3, results='asis'}
 
   pander(descr(dat$originalWidths));
   pander(descr(dat$replicationWidths));
 
   widthsPlot <-
-    grid.arrange(powerHist(dat$originalWidths, normalCurve=FALSE, distCurve=FALSE, returnPlotOnly = TRUE,
+    arrangeGrob(powerHist(dat$originalWidths, normalCurve=FALSE, distCurve=FALSE, returnPlotOnly = TRUE,
                          xLabel = 'Width of 95% confidence interval', yLabel = 'Number of studies') +
                    theme(text = element_text(size = 16)) +
                    ggtitle("95% CI widths in original studies"),
@@ -247,13 +249,13 @@ ggsave(file.path(outputPath, "figure 3 - confidence interval widths.png"),
        height = 5,
        type='cairo-png');
 
-  cat("Width of 95% CI for n=1500, d = .2:",
-      round(cohensdCI(.2, n=1500)[2] - cohensdCI(.2, n=1500)[1], 2));
-  cat("Width of 99% CI for n=1500, d = .2:",
-      round(cohensdCI(.2, n=1500, .99)[2] - cohensdCI(.2, n=1500, .99)[1], 2));
-  cat("Width of 95% CI for n=7500, d = .2:",
-      round(cohensdCI(.2, n=750)[2] - cohensdCI(.2, n=750)[1], 2));
-  cat("Width of 99% CI for n=750, d = .2:",
-      round(cohensdCI(.2, n=750, .99)[2] - cohensdCI(.2, n=750, .99)[1], 2));
+  pandoc.p(paste("Width of 95% CI for n=1500, d = .2:",
+      round(cohensdCI(.2, n=1500)[2] - cohensdCI(.2, n=1500)[1], 2)));
+  pandoc.p(paste("Width of 99% CI for n=1500, d = .2:",
+      round(cohensdCI(.2, n=1500, .99)[2] - cohensdCI(.2, n=1500, .99)[1], 2)));
+  pandoc.p(paste("Width of 95% CI for n=750, d = .2:",
+      round(cohensdCI(.2, n=750)[2] - cohensdCI(.2, n=750)[1], 2)));
+  pandoc.p(paste("Width of 99% CI for n=750, d = .2:",
+      round(cohensdCI(.2, n=750, .99)[2] - cohensdCI(.2, n=750, .99)[1], 2)));
 
 ```
