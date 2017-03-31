@@ -86,6 +86,9 @@ outputPath <- basePath;
 ```
 
 ```{r message=FALSE, warnings=FALSE, results='asis'}
+
+  sessionInfo();
+
   exampleConfInt <- cohensdCI(exampleD, n=exampleN);
   pander(as.data.frame(round(exampleConfInt, 2)));
   pandoc.p(paste("Required sample size with 95% power:", 2 * ceiling(pwr.t.test(d=exampleConfInt[1], power=.95)$n)));
