@@ -87,7 +87,7 @@ outputPath <- basePath;
 
 ```{r message=FALSE, warnings=FALSE, results='asis'}
 
-  sessionInfo();
+  #sessionInfo();
 
   exampleConfInt <- cohensdCI(exampleD, n=exampleN);
   pander(as.data.frame(round(exampleConfInt, 2)));
