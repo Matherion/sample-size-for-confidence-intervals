@@ -15,38 +15,34 @@ output: html_document
 ################################################################################
 
 ########################################################################
-### Paths
-########################################################################
-
-### Add any relevant paths to this vector. The script will select the
-### correct path itself.
-
-basePathVector <- c('B:/Data/research/sample size for confidence intervals/sample-size-for-confidence-intervals',
-                    "");
-
-########################################################################
-### Set the variables with the paths
-########################################################################
-
-### Check which paths exist and set the first existing path in the list
-### as the base path
-basePath <- basePathVector[sapply(basePathVector, dir.exists)][1];
-
-### Set the additional paths
-workingPath <- basePath;
-outputPath <- basePath;
-
-########################################################################
 ### Packages
 ########################################################################
 
   require(userfriendlyscience);
+  require(ufs);
   require(ggplot2);
   require(pander);
   require(pwr);
   require(grid);
   require(gridExtra);
   require(pwr);
+  require('here');
+
+########################################################################
+### Set the variables with the paths
+########################################################################
+  
+  ### Check which paths exist and set the first existing path in the list
+  ### as the base path
+  basePath <- here::here();
+  
+  ### Set the additional paths
+  workingPath <- basePath;
+  outputPath <- basePath;
+  
+########################################################################
+### Settings
+########################################################################
 
   knitr::opts_chunk$set(echo = FALSE);
 
@@ -62,7 +58,7 @@ outputPath <- basePath;
 
   table1 <- sapply(widths, function(width) {
     return(sapply(cohensDvalues, function(cohensD) {
-      return(pwr.cohensdCI(d=cohensD, w=width, conf.level=.95, silent=TRUE));
+      return(ufs::pwr.cohensdCI(d=cohensD, w=width, conf.level=.95, silent=TRUE));
     }));
   });
 
@@ -74,7 +70,7 @@ outputPath <- basePath;
 
   table3 <- sapply(widths, function(width) {
     return(sapply(cohensDvalues, function(cohensD) {
-      return(pwr.cohensdCI(d=cohensD, w=width, conf.level=.99, silent=TRUE));
+      return(ufs::pwr.cohensdCI(d=cohensD, w=width, conf.level=.99, silent=TRUE));
     }));
   });
 
@@ -89,7 +85,7 @@ outputPath <- basePath;
 
   #sessionInfo();
 
-  exampleConfInt <- cohensdCI(exampleD, n=exampleN);
+  exampleConfInt <- ufs::cohensdCI(exampleD, n=exampleN);
   pander(as.data.frame(round(exampleConfInt, 2)));
   pandoc.p(paste("Required sample size with 95% power:", 2 * ceiling(pwr.t.test(d=exampleConfInt[1], power=.95)$n)));
   pandoc.p(paste("Required sample size with 80% power:", 2 * ceiling(pwr.t.test(d=exampleConfInt[1], power=.80)$n)));
@@ -109,7 +105,7 @@ outputPath <- basePath;
 
 ```{r fig.cap="Figure 1", fig.width=10, fig.height=10, results='asis'}
 
-  dSamplingDist <- cohensdCI(d=exampleD, n=exampleN, plot=TRUE);
+  dSamplingDist <- ufs::cohensdCI(d=exampleD, n=exampleN, plot=TRUE);
   dSamplingDist <- attr(dSamplingDist, 'plot') +
     xlab("Cohen's d") + ylab("Density") + ggtitle("Sampling distribution for Cohen's d") +
     theme_bw(base_size = 30) + theme(axis.title.x.top = element_blank());
@@ -121,11 +117,161 @@ outputPath <- basePath;
          width=10, height=10,
          dpi=300, type='cairo-png');
 
+  ### Construct minimal version for EHPS presentation
+  dSamplingDist.minimal <- dSamplingDist +
+    labs(title="", x="", y="") +
+    theme(panel.grid = element_blank(),
+          panel.border = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks = element_blank());
+  ### Adapted/updated from https://stackoverflow.com/questions/13407236/remove-a-layer-from-a-ggplot2-chart
+  layers <- lapply(dSamplingDist.minimal$layers, function(x) if('GeomVline' %in% class(x$geom)) NULL else x);
+  layers <- layers[!sapply(layers, is.null)];
+  dSamplingDist.minimal$layers <- layers;
+
+  ggsave(file.path(basePath, "fig1 - alternative version for presentations.png"),
+         plot = dSamplingDist.minimal,
+         width=10, height=7,
+         dpi=300, type='cairo-png');
+
+  presentationPlotBasis <-
+    ggplot() + 
+      theme_minimal(base_size=20) +
+      theme(plot.background = element_rect(fill = "transparent", color=NA),
+            panel.background = element_rect(fill="white")) +
+      coord_cartesian(xlim=c(-1, 1), ylim=c(0, .41)) +
+      scale_x_continuous(breaks = c(-1, -.5, 0, .5, 1)) +
+      scale_y_continuous(breaks = c(0, .1, .2, .3, .4)) +
+      labs(title = "",
+           x = "Cohen's d (no density curve)",
+           y = "Density (no n specified)") +
+      geom_point(mapping=aes(x=.1, y=.05), color="transparent", size=.01);
+
+  ggsave(file.path(basePath, "presentation plot 0.png"),
+         plot = presentationPlotBasis,
+         width=12, height=6,
+         dpi=300, type='cairo', bg = "transparent");
+
+  presentationPlot1 <- presentationPlotBasis +
+    geom_line(data = data.frame(d = seq(-1, 1.5, 0.001),
+                                density = dd(seq(-1, 1.5, 0.001),
+                                             silent=TRUE,
+                                             df=exampleN-2,
+                                             populationD=0)),
+              mapping = aes(x=d, y=density),
+              size = 1) +
+  labs(y = paste0("Density for n=", exampleN),
+       x = "Cohen's d (true d = 0)");
+
+  ggsave(file.path(basePath, "presentation plot 1.png"),
+         plot = presentationPlot1,
+         width=12, height=6,
+         dpi=300, type='cairo', bg = "transparent");
+
+  presentationPlot2 <- presentationPlotBasis +
+    geom_line(data = data.frame(d = seq(-1, 1.5, 0.001),
+                                density = dd(seq(-1, 1.5, 0.001),
+                                             silent=TRUE,
+                                             df=exampleN-2,
+                                             populationD=exampleD)),
+              mapping = aes(x=d, y=density),
+              size = 1) +
+  labs(y = paste0("Density for n=", exampleN),
+       x = paste0("Cohen's d (true d = ", exampleD, ")"));
+
+  ggsave(file.path(basePath, "presentation plot 2.png"),
+         plot = presentationPlot2,
+         width=12, height=6,
+         dpi=300, type='cairo', bg = "transparent");
+
+  presentationPlot3 <- presentationPlot1 +
+      geom_line(data = data.frame(d = seq(-1, 1.5, 0.001),
+                                  density = dd(seq(-1, 1.5, 0.001),
+                                               silent=TRUE,
+                                               df=exampleN-2,
+                                               populationD=exampleD)),
+                mapping = aes(x=d, y=density),
+                color="red", size=1) +
+  labs(y = paste0("Density for n=", exampleN),
+       x = paste0("Cohen's d (true d = 0 in black and ", exampleD, " in red)"));
+
+  ggsave(file.path(basePath, "presentation plot 3.png"),
+         plot = presentationPlot3,
+         width=12, height=6,
+         dpi=300, type='cairo', bg = "transparent");
+
+  presentationPlot4 <- presentationPlotBasis +
+    geom_line(data = data.frame(d = seq(-1, 1.5, 0.001),
+                                density = dd(seq(-1, 1.5, 0.001),
+                                             silent=TRUE,
+                                             df=598,
+                                             populationD=exampleD)),
+              mapping = aes(x=d, y=density),
+              size = 1) +
+  labs(y = "Density for n=600",
+       x = paste0("Cohen's d (true d = ", exampleD, ")"));
+
+  ggsave(file.path(basePath, "presentation plot 4.png"),
+         plot = presentationPlot4,
+         width=12, height=6,
+         dpi=300, type='cairo', bg = "transparent");
+
+  suppressMessages(
+    ggsave(file.path(basePath, "presentation plot 5.png"),
+           plot = presentationPlot2 +
+             scale_x_continuous(breaks = c(-1, -.5, 0, .5, 1),
+                                sec.axis = dup_axis(breaks=0.5)) +
+             theme(plot.title=element_blank(),
+                   axis.title.x.top=element_blank()),
+           width=12, height=6,
+           dpi=300, type='cairo', bg = "transparent")
+  )
+
+  ggsave(file.path(basePath, "presentation plot 6.png"),
+         plot = dSamplingDist +
+          theme_minimal(base_size=20) +
+          theme(plot.background = element_rect(fill = "transparent", color=NA),
+                panel.background = element_rect(fill="white")) +
+          theme(plot.title=element_blank(),
+                axis.title.x.top=element_blank()) +
+          coord_cartesian(xlim=c(-1, 1), ylim=c(0, .41)) +
+          scale_y_continuous(breaks = c(0, .1, .2, .3, .4)) +
+          labs(x = paste0("Cohen's d (true d = ", exampleD, ")"),
+               y = paste0("Density for n=", exampleN)),
+         width=12, height=6,
+         dpi=300, type='cairo', bg="transparent");
+
+  dSamplingDist2 <- ufs::cohensdCI(d=exampleD, n=600, plot=TRUE);
+  dSamplingDist2 <- attr(dSamplingDist2, 'plot') +
+    theme_minimal(base_size=20) +
+    theme(plot.background = element_rect(fill = "transparent", color=NA),
+          panel.background = element_rect(fill="white")) +
+    theme(plot.title=element_blank(),
+          axis.title.x.top=element_blank()) +
+    coord_cartesian(xlim=c(-1, 1), ylim=c(0, .41)) +
+    scale_y_continuous(breaks = c(0, .1, .2, .3, .4)) +
+    labs(x = paste0("Cohen's d (true d = ", exampleD, ")"),
+         y = paste0("Density for n=600"));
+
+  ggsave(file.path(basePath, "presentation plot 7.png"),
+         plot=dSamplingDist2,
+         width=12, height=6,
+         dpi=300, type='cairo', bg="transparent");
+
+  plot8 <- attr(ufs::cohensdCI(d=.5, n=128, plot=TRUE), 'plot');
+
+  ggsave(file.path(basePath, "presentation plot 8.png"),
+         plot=plot8 + theme(text = element_text(size=20)),
+         width=12, height=6,
+         dpi=300, type='cairo', bg="transparent");
+
+
 ```
 
 ```{r message=FALSE, warning=FALSE, results='asis'}
 
-  if (!file.exists(file.path(basePath, 'rpp_data.csv'))) {
+  if (!file.exists(file.path(basePath,
+                             'rpp_data.csv'))) {
     stop("The file 'rpp_data.csv' is not available. Please visit https://osf.io/fgjvw and download it (see https://osf.io/bhcsf for the codebook).");
   }
 
@@ -138,8 +284,8 @@ outputPath <- basePath;
   pandoc.p(paste("Selected", nrow(dat), "two-cell designs."));
   
   ### Convenient names for the sample size.
-  dat$originalEffectSize <- convert.r.to.d(as.numeric(dat$T_r..O.));
-  dat$replicationEffectSize <- convert.r.to.d(as.numeric(dat$T_r..R.));
+  dat$originalEffectSize <- ufs::convert.r.to.d(as.numeric(dat$T_r..O.));
+  dat$replicationEffectSize <- ufs::convert.r.to.d(as.numeric(dat$T_r..R.));
   dat$originalSampleSize <- as.numeric(dat$N..O.);
   dat$replicationSampleSize <- as.numeric(dat$N..R.);
 
@@ -156,8 +302,10 @@ outputPath <- basePath;
   
   ### Add confidence intervals
   dat <- cbind(dat,
-               cohensdCI(d=dat$originalEffectSize, n=dat$originalSampleSize),
-               cohensdCI(d=dat$replicationEffectSize, n=dat$replicationSampleSize));
+               ufs::cohensdCI(d=dat$originalEffectSize,
+                              n=dat$originalSampleSize),
+               ufs::cohensdCI(d=dat$replicationEffectSize,
+                              n=dat$replicationSampleSize));
   names(dat)[5:8] <- c('original.lo', 'original.hi',
                        'replication.lo', 'replication.hi');
   
@@ -169,22 +317,22 @@ outputPath <- basePath;
 
 ```{r fig.width=9, fig.height=30, warning=FALSE, message=FALSE, results='asis'}
 
-  plotOriginal <- diamondPlot(dat, c(5, 1, 6),
-                              yLabels=paste0("d = ", round(dat[, 1], 2), " ",
-                                             apply(dat[, 5:6], 1, formatCI),
-                                             ", N = ", dat[, 3]),
-                              linetype=1, alpha=.1, fixedSize=.35) +
+  plotOriginal <- ufs::diamondPlot(dat, c(5, 1, 6),
+                                   yLabels=paste0("d = ", round(dat[, 1], 2), " ",
+                                                  apply(dat[, 5:6], 1, formatCI),
+                                                  ", N = ", dat[, 3]),
+                                   linetype=1, alpha=.1, fixedSize=.35) +
     scale_x_continuous(breaks=-3:8) +
     theme(text = element_text(size = 16),
           panel.grid.major.y = element_blank()) +
   xlab("Cohen's d") +
   ggtitle("95% CIs original studies");
   
-  plotReplication <- diamondPlot(dat, c(7, 2, 8),
-                                 yLabels=paste0("d = ", round(dat[, 2], 2), " ",
-                                             apply(dat[, 7:8], 1, formatCI),
-                                             ", N = ", dat[, 4]),
-                                 linetype=1, alpha=.1, fixedSize=.35) +
+  plotReplication <- ufs::diamondPlot(dat, c(7, 2, 8),
+                                      yLabels=paste0("d = ", round(dat[, 2], 2), " ",
+                                                     apply(dat[, 7:8], 1, formatCI),
+                                                     ", N = ", dat[, 4]),
+                                      linetype=1, alpha=.1, fixedSize=.35) +
     scale_x_continuous(breaks=-3:8) +
     theme(text = element_text(size = 16),
           panel.grid.major.y = element_blank()) +
@@ -202,7 +350,12 @@ outputPath <- basePath;
 
 ```{r fig.width=6, fig.height=3, results='asis'}
 
+  cat0("\n\n### Original studies:\n\n");
+
   pander(descr(dat$originalWidths));
+
+  cat0("\n\n### Replications:\n\n");
+
   pander(descr(dat$replicationWidths));
 
   widthsPlot <-
@@ -253,12 +406,30 @@ ggsave(file.path(outputPath, "figure 3 - confidence interval widths.png"),
        type='cairo-png');
 
   pandoc.p(paste("Width of 95% CI for n=1500, d = .2:",
-      round(cohensdCI(.2, n=1500)[2] - cohensdCI(.2, n=1500)[1], 2)));
+      round(ufs::cohensdCI(.2, n=1500)[2] - ufs::cohensdCI(.2, n=1500)[1], 2)));
   pandoc.p(paste("Width of 99% CI for n=1500, d = .2:",
-      round(cohensdCI(.2, n=1500, .99)[2] - cohensdCI(.2, n=1500, .99)[1], 2)));
+      round(ufs::cohensdCI(.2, n=1500, .99)[2] - ufs::cohensdCI(.2, n=1500, .99)[1], 2)));
   pandoc.p(paste("Width of 95% CI for n=750, d = .2:",
-      round(cohensdCI(.2, n=750)[2] - cohensdCI(.2, n=750)[1], 2)));
+      round(ufs::cohensdCI(.2, n=750)[2] - ufs::cohensdCI(.2, n=750)[1], 2)));
   pandoc.p(paste("Width of 99% CI for n=750, d = .2:",
-      round(cohensdCI(.2, n=750, .99)[2] - cohensdCI(.2, n=750, .99)[1], 2)));
+      round(ufs::cohensdCI(.2, n=750, .99)[2] - ufs::cohensdCI(.2, n=750, .99)[1], 2)));
+
+### Numbers for presentation at EHPS 2017, Padova
+# round(apply(cohensdCI(.5, c(50, 100, 200, 300, 400, 500, 1000, 1500, 2000), .95), 1, diff), 2);
+# round(apply(cohensdCI(.5, c(50, 100, 200, 300, 400, 500, 1000, 1500, 2000), .99), 1, diff), 2);
+# round(pwr.t.test(n=c(50, 100, 200, 300, 400, 500, 1000, 1500, 2000), d=.5)$power * 100);
+# round(pwr.t.test(n=c(50, 100, 200, 300, 400, 500, 1000, 1500, 2000), d=.5, sig.level=.005)$power * 100);
+
+
+```
+
+
+```{r}
+
+### TOST examples
+
+ufs::confIntD(0, 69);
+
+ufs::confIntD(0.6, 69);
 
 ```
