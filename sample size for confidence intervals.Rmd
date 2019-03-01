@@ -405,13 +405,13 @@ ggsave(file.path(outputPath, "figure 3 - confidence interval widths.png"),
        height = 5,
        type='cairo-png');
 
-  pandoc.p(paste("Width of 95% CI for n=1500, d = .2:",
+  pander::pandoc.p(paste("Width of 95% CI for n=1500, d = .2:",
       round(ufs::cohensdCI(.2, n=1500)[2] - ufs::cohensdCI(.2, n=1500)[1], 2)));
-  pandoc.p(paste("Width of 99% CI for n=1500, d = .2:",
+  pander::pandoc.p(paste("Width of 99% CI for n=1500, d = .2:",
       round(ufs::cohensdCI(.2, n=1500, .99)[2] - ufs::cohensdCI(.2, n=1500, .99)[1], 2)));
-  pandoc.p(paste("Width of 95% CI for n=750, d = .2:",
+  pander::pandoc.p(paste("Width of 95% CI for n=750, d = .2:",
       round(ufs::cohensdCI(.2, n=750)[2] - ufs::cohensdCI(.2, n=750)[1], 2)));
-  pandoc.p(paste("Width of 99% CI for n=750, d = .2:",
+  pander::pandoc.p(paste("Width of 99% CI for n=750, d = .2:",
       round(ufs::cohensdCI(.2, n=750, .99)[2] - ufs::cohensdCI(.2, n=750, .99)[1], 2)));
 
 ### Numbers for presentation at EHPS 2017, Padova
